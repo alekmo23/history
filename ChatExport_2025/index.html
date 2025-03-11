@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Архив сообщений</title>
+    <style>
+        /* Стили остаются без изменений */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f2f5;
+            color: #1d1d1d;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .message-list {
+            display: grid;
+            gap: 20px;
+        }
+
+        .message-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .message-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .message-date {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .message-preview {
+            color: #333;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Архив сообщений</h1>
+            <p>Выберите сообщение для просмотра</p>
+        </div>
+        
+        <div class="message-list" id="messageList"></div>
+    </div>
+
+    <script>
+        function formatDate(dateString) {
+            const months = [
+                'января', 'февраля', 'марта', 'апреля', 
+                'мая', 'июня', 'июля', 'августа',
+                'сентября', 'октября', 'ноября', 'декабря'
+            ];
+            
+            const [datePart, timePart] = dateString.split(' ');
+            const [day, month, year] = datePart.split('.');
+            const [hours, minutes] = timePart.split(':');
+            
+            return `${parseInt(day)} ${months[parseInt(month)-1]} ${year}, ${hours}:${minutes}`;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch('messages.html')
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.text();
+                })
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    const messages = Array.from(doc.querySelectorAll('.message.default.clearfix')).map(msg => {
+                        const dateElement = msg.querySelector('.date.details[title]');
+                        
+                        if (!dateElement) {
+                            console.warn('Элемент с датой не найден', msg);
+                            return null;
+                        }
+
+                        const rawDate = dateElement.getAttribute('title');
+                        const contentElement = msg.querySelector('.text');
+                        const mediaElement = msg.querySelector('.media_wrap');
+                        
+                        try {
+                            return {
+                                date: formatDate(rawDate.split(' ')[0] + ' ' + rawDate.split(' ')[1]),
+                                content: contentElement?.innerHTML || 'Нет текста',
+                                media: mediaElement?.innerHTML || ''
+                            };
+                        } catch (e) {
+                            console.error('Ошибка парсинга даты:', rawDate);
+                            return null;
+                        }
+                    }).filter(msg => msg !== null);
+
+                    const messageList = document.getElementById('messageList');
+                    
+                    messages.forEach(msg => {
+                        const card = document.createElement('div');
+                        card.className = 'message-card';
+                        card.innerHTML = `
+                            <div class="message-date">${msg.date}</div>
+                            <div class="message-preview">
+                                ${msg.media}
+                                ${msg.content}
+                            </div>
+                        `;
+                        messageList.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    document.getElementById('messageList').innerHTML = `
+                        <div style="color: red; padding: 20px; text-align: center">
+                            Ошибка загрузки: ${error.message}<br>
+                            Проверьте наличие файла messages.html
+                        </div>
+                    `;
+                });
+        });
+    </script>
+</body>
+</html>
